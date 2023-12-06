@@ -458,39 +458,37 @@ class Client extends EventEmitter {
                 });
             }, Events);
 
-            if (isAuthenticated &#x3D;&#x3D;&#x3D; true) {
-                await this.playPage.evaluate((Events) &#x3D;&gt; {
-                    window.WPP.on(&#x27;conn.main_ready&#x27;, async () &#x3D;&gt; {
-                        window.WPP.whatsapp.MsgStore.on(&#x27;change&#x27;, (msg) &#x3D;&gt; { window.onChangeMessageEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on(&#x27;change:type&#x27;, (msg) &#x3D;&gt; { window.onChangeMessageTypeEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on(&#x27;change:ack&#x27;, (msg, ack) &#x3D;&gt; { window.onMessageAckEvent(window.WAJS.getMessageModel(msg), ack); });
-                        window.WPP.whatsapp.MsgStore.on(&#x27;change:isUnsentMedia&#x27;, (msg, unsent) &#x3D;&gt; { if (msg.id.fromMe &amp;amp;&amp;amp; !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on(&#x27;remove&#x27;, (msg) &#x3D;&gt; { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on(&#x27;change:caption&#x27;, (msg, newBody, prevBody) &#x3D;&gt; { window.onEditMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
-                        window.WPP.whatsapp.Socket.on(&#x27;change:state&#x27;, (_AppState, state) &#x3D;&gt; { window.onAppStateChangedEvent(state); });
-                        window.WPP.whatsapp.CallStore.on(&#x27;add&#x27;, (call) &#x3D;&gt; { window.onIncomingCall(call); });
-                        window.WPP.whatsapp.ChatStore.on(&#x27;remove&#x27;, async (chat) &#x3D;&gt; { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
-                        window.WPP.whatsapp.ChatStore.on(&#x27;change:archive&#x27;, async (chat, currState, prevState) &#x3D;&gt; { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
-                        window.WPP.on(&#x27;chat.new_message&#x27;, (msg) &#x3D;&gt; {
-                            if (msg.isNewMsg) {
-                                if (msg.type &#x3D;&#x3D;&#x3D; &#x27;ciphertext&#x27;) {
-                                    // defer message event until ciphertext is resolved (type changed)
-                                    msg.once(&#x27;change:type&#x27;, (_msg) &#x3D;&gt; window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
-                                } else {
-                                    window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
-                                }
+            await this.playPage.evaluate((Events) &#x3D;&gt; {
+                window.WPP.on(&#x27;conn.main_ready&#x27;, async () &#x3D;&gt; {
+                    window.WPP.whatsapp.MsgStore.on(&#x27;change&#x27;, (msg) &#x3D;&gt; { window.onChangeMessageEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on(&#x27;change:type&#x27;, (msg) &#x3D;&gt; { window.onChangeMessageTypeEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on(&#x27;change:ack&#x27;, (msg, ack) &#x3D;&gt; { window.onMessageAckEvent(window.WAJS.getMessageModel(msg), ack); });
+                    window.WPP.whatsapp.MsgStore.on(&#x27;change:isUnsentMedia&#x27;, (msg, unsent) &#x3D;&gt; { if (msg.id.fromMe &amp;amp;&amp;amp; !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on(&#x27;remove&#x27;, (msg) &#x3D;&gt; { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on(&#x27;change:caption&#x27;, (msg, newBody, prevBody) &#x3D;&gt; { window.onEditMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
+                    window.WPP.whatsapp.Socket.on(&#x27;change:state&#x27;, (_AppState, state) &#x3D;&gt; { window.onAppStateChangedEvent(state); });
+                    window.WPP.whatsapp.CallStore.on(&#x27;add&#x27;, (call) &#x3D;&gt; { window.onIncomingCall(call); });
+                    window.WPP.whatsapp.ChatStore.on(&#x27;remove&#x27;, async (chat) &#x3D;&gt; { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
+                    window.WPP.whatsapp.ChatStore.on(&#x27;change:archive&#x27;, async (chat, currState, prevState) &#x3D;&gt; { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
+                    window.WPP.on(&#x27;chat.new_message&#x27;, (msg) &#x3D;&gt; {
+                        if (msg.isNewMsg) {
+                            if (msg.type &#x3D;&#x3D;&#x3D; &#x27;ciphertext&#x27;) {
+                                // defer message event until ciphertext is resolved (type changed)
+                                msg.once(&#x27;change:type&#x27;, (_msg) &#x3D;&gt; window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
+                            } else {
+                                window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
                             }
-                        });
-                        window.WPP.whatsapp.ChatStore.on(&#x27;change:unreadCount&#x27;, async (chat) &#x3D;&gt; { window.onChatUnreadCountEvent(await window.WAJS.getChatModel(chat)); });
-    
-                        window.WPP.on(&#x27;chat.new_reaction&#x27;, (reaction) &#x3D;&gt; {
-                            window.onReaction([reaction]);
-                        });
-    
-                        window.EmitEvent(Events.READY);
+                        }
                     });
-                }, Events);
-            }
+                    window.WPP.whatsapp.ChatStore.on(&#x27;change:unreadCount&#x27;, async (chat) &#x3D;&gt; { window.onChatUnreadCountEvent(await window.WAJS.getChatModel(chat)); });
+
+                    window.WPP.on(&#x27;chat.new_reaction&#x27;, (reaction) &#x3D;&gt; {
+                        window.onReaction([reaction]);
+                    });
+
+                    window.EmitEvent(Events.READY);
+                });
+            }, Events);
 
             await this.playPage.evaluate((Events) &#x3D;&gt; {
                 window.WPP.whatsapp.Cmd.on(&#x27;logout&#x27;, () &#x3D;&gt; window.EmitEvent(Events.DISCONNECTED, &#x27;NAVIGATION&#x27;));
@@ -604,12 +602,12 @@ class Client extends EventEmitter {
         if (content instanceof MessageMedia) {
             internalOptions.attachment &#x3D; content;
             internalOptions.isViewOnce &#x3D; options.isViewOnce,
-            content &#x3D; &#x27;&#x27;;
+                content &#x3D; &#x27;&#x27;;
         } else if (options.media instanceof MessageMedia) {
             internalOptions.attachment &#x3D; options.media;
             internalOptions.caption &#x3D; content;
             internalOptions.isViewOnce &#x3D; options.isViewOnce,
-            content &#x3D; &#x27;&#x27;;
+                content &#x3D; &#x27;&#x27;;
         } else if (content instanceof Location) {
             internalOptions.location &#x3D; content;
             content &#x3D; &#x27;&#x27;;
@@ -627,11 +625,11 @@ class Client extends EventEmitter {
         if (internalOptions.sendMediaAsSticker &amp;amp;&amp;amp; internalOptions.attachment) {
             internalOptions.attachment &#x3D; await Util.formatToWebpSticker(
                 internalOptions.attachment, {
-                    name: options.stickerName,
-                    author: options.stickerAuthor,
-                    categories: options.stickerCategories,
-                    isAvatarSticker: options.stickerIsAvatar,
-                }, this.playPage
+                name: options.stickerName,
+                author: options.stickerAuthor,
+                categories: options.stickerCategories,
+                isAvatarSticker: options.stickerIsAvatar,
+            }, this.playPage
             );
         }
 

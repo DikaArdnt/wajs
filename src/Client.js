@@ -427,39 +427,37 @@ class Client extends EventEmitter {
                 });
             }, Events);
 
-            if (isAuthenticated === true) {
-                await this.playPage.evaluate((Events) => {
-                    window.WPP.on('conn.main_ready', async () => {
-                        window.WPP.whatsapp.MsgStore.on('change', (msg) => { window.onChangeMessageEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on('change:type', (msg) => { window.onChangeMessageTypeEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on('change:ack', (msg, ack) => { window.onMessageAckEvent(window.WAJS.getMessageModel(msg), ack); });
-                        window.WPP.whatsapp.MsgStore.on('change:isUnsentMedia', (msg, unsent) => { if (msg.id.fromMe && !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on('remove', (msg) => { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
-                        window.WPP.whatsapp.MsgStore.on('change:caption', (msg, newBody, prevBody) => { window.onEditMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
-                        window.WPP.whatsapp.Socket.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
-                        window.WPP.whatsapp.CallStore.on('add', (call) => { window.onIncomingCall(call); });
-                        window.WPP.whatsapp.ChatStore.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
-                        window.WPP.whatsapp.ChatStore.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
-                        window.WPP.on('chat.new_message', (msg) => {
-                            if (msg.isNewMsg) {
-                                if (msg.type === 'ciphertext') {
-                                    // defer message event until ciphertext is resolved (type changed)
-                                    msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
-                                } else {
-                                    window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
-                                }
+            await this.playPage.evaluate((Events) => {
+                window.WPP.on('conn.main_ready', async () => {
+                    window.WPP.whatsapp.MsgStore.on('change', (msg) => { window.onChangeMessageEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on('change:type', (msg) => { window.onChangeMessageTypeEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on('change:ack', (msg, ack) => { window.onMessageAckEvent(window.WAJS.getMessageModel(msg), ack); });
+                    window.WPP.whatsapp.MsgStore.on('change:isUnsentMedia', (msg, unsent) => { if (msg.id.fromMe && !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on('remove', (msg) => { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
+                    window.WPP.whatsapp.MsgStore.on('change:caption', (msg, newBody, prevBody) => { window.onEditMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
+                    window.WPP.whatsapp.Socket.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
+                    window.WPP.whatsapp.CallStore.on('add', (call) => { window.onIncomingCall(call); });
+                    window.WPP.whatsapp.ChatStore.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
+                    window.WPP.whatsapp.ChatStore.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
+                    window.WPP.on('chat.new_message', (msg) => {
+                        if (msg.isNewMsg) {
+                            if (msg.type === 'ciphertext') {
+                                // defer message event until ciphertext is resolved (type changed)
+                                msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
+                            } else {
+                                window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
                             }
-                        });
-                        window.WPP.whatsapp.ChatStore.on('change:unreadCount', async (chat) => { window.onChatUnreadCountEvent(await window.WAJS.getChatModel(chat)); });
-    
-                        window.WPP.on('chat.new_reaction', (reaction) => {
-                            window.onReaction([reaction]);
-                        });
-    
-                        window.EmitEvent(Events.READY);
+                        }
                     });
-                }, Events);
-            }
+                    window.WPP.whatsapp.ChatStore.on('change:unreadCount', async (chat) => { window.onChatUnreadCountEvent(await window.WAJS.getChatModel(chat)); });
+
+                    window.WPP.on('chat.new_reaction', (reaction) => {
+                        window.onReaction([reaction]);
+                    });
+
+                    window.EmitEvent(Events.READY);
+                });
+            }, Events);
 
             await this.playPage.evaluate((Events) => {
                 window.WPP.whatsapp.Cmd.on('logout', () => window.EmitEvent(Events.DISCONNECTED, 'NAVIGATION'));
