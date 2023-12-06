@@ -1,0 +1,403 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta name="generator" content="JSDoc 3.6.11">
+  <meta charset="utf-8">
+  <title>wajs 1.1.0 &raquo; Source: Structures/GroupChat.js</title>
+  <link rel="stylesheet" href="https://brick.a.ssl.fastly.net/Karla:400,400i,700,700i" type="text/css">
+  <link rel="stylesheet" href="https://brick.a.ssl.fastly.net/Noto+Serif:400,400i,700,700i" type="text/css">
+  <link rel="stylesheet" href="https://brick.a.ssl.fastly.net/Inconsolata:500" type="text/css">
+  <link href="css/baseline.css" rel="stylesheet">
+</head>
+
+<body onload="prettyPrint()">
+  <nav id="jsdoc-navbar" role="navigation" class="jsdoc-navbar">
+    <div id="jsdoc-navbar-container">
+      <div id="jsdoc-navbar-content">
+        <a href="index.html" class="jsdoc-navbar-package-name">wajs 1.<wbr>1.<wbr>0</a>
+      </div>
+    </div>
+  </nav>
+  <div id="jsdoc-body-container">
+    <div id="jsdoc-content">
+      <div id="jsdoc-content-container">
+        <div id="jsdoc-banner" role="banner">
+        </div>
+        <div id="jsdoc-main" role="main">
+          <header class="page-header">
+            <h1>Source: Structures/GroupChat.js</h1>
+          </header>
+          <article>
+            <pre class="prettyprint linenums"><code>&#x27;use strict&#x27;;
+
+const Chat &#x3D; require(&#x27;./Chat&#x27;);
+
+/**
+ * Group participant information
+ * @typedef {Object} GroupParticipant
+ * @property {ContactId} id
+ * @property {boolean} isAdmin
+ * @property {boolean} isSuperAdmin
+ */
+
+/**
+ * Represents a Group Chat on WhatsApp
+ * @extends {Chat}
+ */
+class GroupChat extends Chat {
+    _patch(data) {
+        this.groupMetadata &#x3D; data.groupMetadata;
+
+        return super._patch(data);
+    }
+
+    /**
+     * Gets the group owner
+     * @type {ContactId}
+     */
+    get owner() {
+        return this.groupMetadata.owner;
+    }
+
+    /**
+     * Gets the date at which the group was created
+     * @type {date}
+     */
+    get createdAt() {
+        return new Date(this.groupMetadata.creation * 1000);
+    }
+
+    /** 
+     * Gets the group description
+     * @type {string}
+     */
+    get description() {
+        return this.groupMetadata.desc;
+    }
+
+    /**
+     * Gets the group participants
+     * @type {Array&amp;lt;GroupParticipant&gt;}
+     */
+    get participants() {
+        return this.groupMetadata.participants;
+    }
+
+    /**
+     * An object that handles the result for {@link addParticipants} method
+     * @typedef {Object} AddParticipantsResult
+     * @property {number} code The code of the result
+     * @property {string} message The result message
+     * @property {boolean} isInviteV4Sent Indicates if the inviteV4 was sent to the partitipant
+     */
+
+    /**
+     * An object that handles options for adding participants
+     * @typedef {Object} AddParticipnatsOptions
+     * @property {Array&amp;lt;number&gt;|number} [sleep &#x3D; [250, 500]] The number of milliseconds to wait before adding the next participant. If it is an array, a random sleep time between the sleep[0] and sleep[1] values will be added (the difference must be &gt;&#x3D;100 ms, otherwise, a random sleep time between sleep[1] and sleep[1] + 100 will be added). If sleep is a number, a sleep time equal to its value will be added. By default, sleep is an array with a value of [250, 500]
+     * @property {boolean} [autoSendInviteV4 &#x3D; true] If true, the inviteV4 will be sent to those participants who have restricted others from being automatically added to groups, otherwise the inviteV4 won&#x27;t be sent (true by default)
+     * @property {string} [comment &#x3D; &#x27;&#x27;] The comment to be added to an inviteV4 (empty string by default)
+     */
+
+    /**
+     * Adds a list of participants by ID to the group
+     * @param {string|Array&amp;lt;string&gt;} participantIds 
+     * @param {AddParticipnatsOptions} options An object thay handles options for adding participants
+     * @returns {Promise&amp;lt;Object.&amp;lt;string, AddParticipantsResult&gt;|string&gt;} Returns an object with the resulting data or an error message as a string
+     */
+    async addParticipants(participantIds, options &#x3D; {}) {
+        return await this.client.playPage.evaluate(async ({ groupId, participantIds, options }) &#x3D;&gt; {
+            const { autoSendInviteV4 &#x3D; true, comment &#x3D; &#x27;&#x27; } &#x3D; options;
+            const groupWid &#x3D; window.WPP.whatsapp.WidFactory.createWid(groupId);
+            const group &#x3D; await window.WPP.whatsapp.ChatStore.find(groupWid);
+
+            for (let participant of participantIds) {
+                const pWid &#x3D; window.WPP.whatsapp.WidFactory.createWid(participant);
+                const result &#x3D; await window.WPP.group.addParticipants(groupId, [participant]);
+                const rpcResult &#x3D; result[participant];
+
+                if (autoSendInviteV4 &amp;amp;&amp;amp; rpcResult.code &#x3D;&#x3D;&#x3D; 403) {
+                    let userChat, isInviteV4Sent &#x3D; false;
+                    window.WPP.whatsapp.ContactStore.gadd(pWid, { silent: true });
+
+                    if (rpcResult.message.includes(&#x27;ParticipantRequestCodeCanBeSent&#x27;) &amp;amp;&amp;amp;
+                        (userChat &#x3D; await window.WPP.whatsapp.ChatStore.find(pWid))) {
+                        const groupName &#x3D; group.formattedTitle || group.name;
+                        const res &#x3D; await window.WPP.whatsapp.ChatModel.sendGroupInviteMessage(
+                            userChat,
+                            group.id._serialized,
+                            groupName,
+                            rpcResult.invite_code,
+                            rpcResult.invite_code_exp,
+                            comment,
+                            await window.WAJS.getProfilePicThumbToBase64(groupWid)
+                        );
+                        isInviteV4Sent &#x3D; window.WAJS.compareWwebVersions(window.Debug.VERSION, &#x27;&amp;lt;&#x27;, &#x27;2.2335.6&#x27;)
+                            ? res &#x3D;&#x3D;&#x3D; &#x27;OK&#x27;
+                            : res.messageSendResult &#x3D;&#x3D;&#x3D; &#x27;OK&#x27;;
+                    }
+
+                    result[participant].isInviteV4Sent &#x3D; isInviteV4Sent;
+                }
+
+                return rpcResult;
+            }
+        }, { groupId: this.id._serialized, participantIds, options });
+    }
+
+    /**
+     * Removes a list of participants by ID to the group
+     * @param {Array&amp;lt;string&gt;} participantIds 
+     * @returns {Promise&amp;lt;{ status: number }&gt;}
+     */
+    async removeParticipants(participantIds) {
+        return await this.client.playPage.evaluate(async ({ chatId, participantIds }) &#x3D;&gt; {
+            return await window.WPP.group.removeParticipants(chatId, participantIds);
+        }, { chatId: this.id._serialized, participantIds });
+    }
+
+    /**
+     * Promotes participants by IDs to admins
+     * @param {Array&amp;lt;string&gt;} participantIds 
+     * @returns {Promise&amp;lt;{ status: number }&gt;} Object with status code indicating if the operation was successful
+     */
+    async promoteParticipants(participantIds) {
+        return await this.client.playPage.evaluate(async ({ chatId, participantIds }) &#x3D;&gt; {
+            return await window.WPP.group.promoteParticipants(chatId, participantIds);
+        }, { chatId: this.id._serialized, participantIds });
+    }
+
+    /**
+     * Demotes participants by IDs to regular users
+     * @param {Array&amp;lt;string&gt;} participantIds 
+     * @returns {Promise&amp;lt;{ status: number }&gt;} Object with status code indicating if the operation was successful
+     */
+    async demoteParticipants(participantIds) {
+        return await this.client.playPage.evaluate(async ({ chatId, participantIds }) &#x3D;&gt; {
+            return await window.WPP.group.demoteParticipants(chatId, participantIds);
+        }, { chatId: this.id._serialized, participantIds });
+    }
+
+    /**
+     * Updates the group subject
+     * @param {string} subject 
+     * @returns {Promise&amp;lt;boolean&gt;} Returns true if the subject was properly updated. This can return false if the user does not have the necessary permissions.
+     */
+    async setSubject(subject) {
+        const success &#x3D; await this.client.playPage.evaluate(async ({ chatId, subject }) &#x3D;&gt; {
+            try {
+                await window.WPP.group.setSubject(chatId, subject);
+                return true;
+            } catch (err) {
+                if (err.name &#x3D;&#x3D;&#x3D; &#x27;ServerStatusCodeError&#x27;) return false;
+                throw err;
+            }
+        }, { chatId: this.id._serialized, subject });
+
+        if (!success) return false;
+        this.name &#x3D; subject;
+        return true;
+    }
+
+    /**
+     * Updates the group description
+     * @param {string} description 
+     * @returns {Promise&amp;lt;boolean&gt;} Returns true if the description was properly updated. This can return false if the user does not have the necessary permissions.
+     */
+    async setDescription(description) {
+        const success &#x3D; await this.client.playPage.evaluate(async ({ chatId, description }) &#x3D;&gt; {
+            try {
+                await window.WPP.group.setDescription(chatId, description);
+                return true;
+            } catch (err) {
+                if (err.name &#x3D;&#x3D;&#x3D; &#x27;ServerStatusCodeError&#x27;) return false;
+                throw err;
+            }
+        }, { chatId: this.id._serialized, description });
+
+        if (!success) return false;
+        this.groupMetadata.desc &#x3D; description;
+        return true;
+    }
+
+    /**
+     * Updates the group settings to only allow admins to send messages.
+     * @param {boolean} [adminsOnly&#x3D;true] Enable or disable this option 
+     * @returns {Promise&amp;lt;boolean&gt;} Returns true if the setting was properly updated. This can return false if the user does not have the necessary permissions.
+     */
+    async setMessagesAdminsOnly(adminsOnly &#x3D; true) {
+        const success &#x3D; await this.client.playPage.evaluate(async ({ chatId, adminsOnly }) &#x3D;&gt; {
+            try {
+                await window.WPP.group.setProperty(chatId, &#x27;announcement&#x27;, adminsOnly ? 1 : 0);
+                return true;
+            } catch (err) {
+                if (err.name &#x3D;&#x3D;&#x3D; &#x27;ServerStatusCodeError&#x27;) return false;
+                throw err;
+            }
+        }, { chatId: this.id._serialized, adminsOnly });
+
+        if (!success) return false;
+
+        this.groupMetadata.announce &#x3D; adminsOnly;
+        return true;
+    }
+
+    /**
+     * Updates the group settings to only allow admins to edit group info (title, description, photo).
+     * @param {boolean} [adminsOnly&#x3D;true] Enable or disable this option 
+     * @returns {Promise&amp;lt;boolean&gt;} Returns true if the setting was properly updated. This can return false if the user does not have the necessary permissions.
+     */
+    async setInfoAdminsOnly(adminsOnly &#x3D; true) {
+        const success &#x3D; await this.client.playPage.evaluate(async ({ chatId, adminsOnly }) &#x3D;&gt; {
+            try {
+                await window.WPP.group.setProperty(chatId, &#x27;restrict&#x27;, adminsOnly ? 1 : 0);
+                return true;
+            } catch (err) {
+                if (err.name &#x3D;&#x3D;&#x3D; &#x27;ServerStatusCodeError&#x27;) return false;
+                throw err;
+            }
+        }, { chatId: this.id._serialized, adminsOnly });
+
+        if (!success) return false;
+
+        this.groupMetadata.restrict &#x3D; adminsOnly;
+        return true;
+    }
+
+    /**
+     * Deletes the group&#x27;s picture.
+     * @returns {Promise&amp;lt;boolean&gt;} Returns true if the picture was properly deleted. This can return false if the user does not have the necessary permissions.
+     */
+    async deletePicture() {
+        const success &#x3D; await this.client.playPage.evaluate((chatid) &#x3D;&gt; {
+            const chat &#x3D; window.WPP.whatsapp.WidFactory.createWid(chatid);
+            return window.WPP.whatsapp.functions.requestDeletePicture(chat);
+        }, this.id._serialized);
+
+        return success;
+    }
+
+    /**
+     * Sets the group&#x27;s picture.
+     * @param {MessageMedia} media
+     * @returns {Promise&amp;lt;boolean&gt;} Returns true if the picture was properly updated. This can return false if the user does not have the necessary permissions.
+     */
+    async setPicture(media) {
+        const success &#x3D; await this.client.playPage.evaluate(({ chatid, media }) &#x3D;&gt; {
+            return window.WAJS.setPicture(chatid, media);
+        }, { chatId: this.id._serialized, media });
+
+        return success;
+    }
+
+    /**
+     * Gets the invite code for a specific group
+     * @returns {Promise&amp;lt;string&gt;} Group&#x27;s invite code
+     */
+    async getInviteCode() {
+        const codeRes &#x3D; await this.client.playPage.evaluate(async chatId &#x3D;&gt; {
+            return window.WPP.group.getInviteCode(chatId);
+        }, this.id._serialized);
+
+        return codeRes;
+    }
+
+    /**
+     * Invalidates the current group invite code and generates a new one
+     * @returns {Promise&amp;lt;string&gt;} New invite code
+     */
+    async revokeInvite() {
+        const codeRes &#x3D; await this.client.playPage.evaluate(chatId &#x3D;&gt; {
+            return window.WPP.group.revokeInviteCode(chatId);
+        }, this.id._serialized);
+
+        return codeRes;
+    }
+
+    /**
+     * An object that handles the information about the group membership request
+     * @typedef {Object} GroupMembershipRequest
+     * @property {Object} id The wid of a user who requests to enter the group
+     * @property {Object} addedBy The wid of a user who created that request
+     * @property {Object|null} parentGroupId The wid of a community parent group to which the current group is linked
+     * @property {string} requestMethod The method used to create the request: NonAdminAdd/InviteLink/LinkedGroupJoin
+     * @property {number} t The timestamp the request was created at
+     */
+
+    /**
+     * Gets an array of membership requests
+     * @returns {Promise&amp;lt;Array&amp;lt;GroupMembershipRequest&gt;&gt;} An array of membership requests
+     */
+    async getGroupMembershipRequests() {
+        return await this.client.getGroupMembershipRequests(this.id._serialized);
+    }
+
+    /**
+     * An object that handles the result for membership request action
+     * @typedef {Object} MembershipRequestActionResult
+     * @property {string} requesterId User ID whos membership request was approved/rejected
+     * @property {number} error An error code that occurred during the operation for the participant
+     * @property {string} message A message with a result of membership request action
+     */
+
+    /**
+     * An object that handles options for {@link approveGroupMembershipRequests} and {@link rejectGroupMembershipRequests} methods
+     * @typedef {Object} MembershipRequestActionOptions
+     * @property {Array&amp;lt;string&gt;|string|null} requesterIds User ID/s who requested to join the group, if no value is provided, the method will search for all membership requests for that group
+     * @property {Array&amp;lt;number&gt;|number|null} sleep The number of milliseconds to wait before performing an operation for the next requester. If it is an array, a random sleep time between the sleep[0] and sleep[1] values will be added (the difference must be &gt;&#x3D;100 ms, otherwise, a random sleep time between sleep[1] and sleep[1] + 100 will be added). If sleep is a number, a sleep time equal to its value will be added. By default, sleep is an array with a value of [250, 500]
+     */
+
+    /**
+     * Approves membership requests if any
+     * @param {MembershipRequestActionOptions} options Options for performing a membership request action
+     * @returns {Promise&amp;lt;Array&amp;lt;MembershipRequestActionResult&gt;&gt;} Returns an array of requester IDs whose membership requests were approved and an error for each requester, if any occurred during the operation. If there are no requests, an empty array will be returned
+     */
+    async approveGroupMembershipRequests(options &#x3D; {}) {
+        return await this.client.approveGroupMembershipRequests(this.id._serialized, options);
+    }
+
+    /**
+     * Rejects membership requests if any
+     * @param {MembershipRequestActionOptions} options Options for performing a membership request action
+     * @returns {Promise&amp;lt;Array&amp;lt;MembershipRequestActionResult&gt;&gt;} Returns an array of requester IDs whose membership requests were rejected and an error for each requester, if any occurred during the operation. If there are no requests, an empty array will be returned
+     */
+    async rejectGroupMembershipRequests(options &#x3D; {}) {
+        return await this.client.rejectGroupMembershipRequests(this.id._serialized, options);
+    }
+
+    /**
+     * Makes the bot leave the group
+     * @returns {Promise}
+     */
+    async leave() {
+        await this.client.playPage.evaluate(async chatId &#x3D;&gt; {
+            return await window.WPP.group.leave(chatId);
+        }, this.id._serialized);
+    }
+}
+
+module.exports &#x3D; GroupChat;
+</code></pre>
+          </article>
+        </div>
+      </div>
+      <nav id="jsdoc-toc-nav" role="navigation"></nav>
+    </div>
+  </div>
+  <footer id="jsdoc-footer" class="jsdoc-footer">
+    <div id="jsdoc-footer-container">
+      <p>
+        Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc</a> 3.6.11 on December 7, 2023.
+      </p>
+    </div>
+  </footer>
+  <script src="scripts/jquery.min.js"></script>
+  <script src="scripts/tree.jquery.js"></script>
+  <script src="scripts/prettify.js"></script>
+  <script src="scripts/jsdoc-toc.js"></script>
+  <script src="scripts/linenumber.js"></script>
+  <script src="scripts/scrollanchor.js"></script>
+</body>
+
+</html>
