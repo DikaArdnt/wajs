@@ -78,40 +78,29 @@ class GroupChat extends Chat {
     async addParticipants(participantIds, options = {}) {
         return await this.client.playPage.evaluate(async ({ groupId, participantIds, options }) => {
             const { autoSendInviteV4 = true, comment = '' } = options;
-            const groupWid = window.WPP.whatsapp.WidFactory.createWid(groupId);
-            const group = await window.WPP.whatsapp.ChatStore.find(groupWid);
+
+            const group = await window.WPP.chat.get(groupId);
+            const results = await window.WPP.group.addParticipants(groupId, participantIds);
 
             for (let participant of participantIds) {
-                const pWid = window.WPP.whatsapp.WidFactory.createWid(participant);
-                const result = await window.WPP.group.addParticipants(groupId, [participant]);
-                const rpcResult = result[participant];
+                const result = results[participant];
+                const userChat = window.WPP.chat.get(participant);
 
-                if (autoSendInviteV4 && rpcResult.code === 403) {
-                    let userChat, isInviteV4Sent = false;
-                    window.WPP.whatsapp.ContactStore.gadd(pWid, { silent: true });
-
-                    if (rpcResult.message.includes('ParticipantRequestCodeCanBeSent') &&
-                        (userChat = await window.WPP.whatsapp.ChatStore.find(pWid))) {
-                        const groupName = group.formattedTitle || group.name;
-                        const res = await window.WPP.whatsapp.ChatModel.sendGroupInviteMessage(
-                            userChat,
-                            group.id._serialized,
-                            groupName,
-                            rpcResult.invite_code,
-                            rpcResult.invite_code_exp,
-                            comment,
-                            await window.WAJS.getProfilePicThumbToBase64(groupWid)
-                        );
-                        isInviteV4Sent = window.WAJS.compareWwebVersions(window.Debug.VERSION, '<', '2.2335.6')
-                            ? res === 'OK'
-                            : res.messageSendResult === 'OK';
-                    }
-
-                    result[participant].isInviteV4Sent = isInviteV4Sent;
+                if (autoSendInviteV4 && result.code === 403) {
+                    const groupName = group.formattedTitle || group.name || group.subject;
+                    await window.Store.GroupInviteV4.sendGroupInviteMessage(
+                        userChat,
+                        groupId,
+                        groupName,
+                        result.invite_code,
+                        result.invite_code_exp,
+                        comment,
+                        await window.WAJS.getProfilePicThumbToBase64(groupId)
+                    );
                 }
-
-                return rpcResult;
             }
+
+            return results;
         }, { groupId: this.id._serialized, participantIds, options });
     }
 

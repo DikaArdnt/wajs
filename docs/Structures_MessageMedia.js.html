@@ -97,7 +97,7 @@ class MessageMedia {
      */
     static async fromUrl(url, options &#x3D; {}) {
         const pUrl &#x3D; new URL(url);
-        let mimetype &#x3D; mime.getType(pUrl.pathname);
+        let mimetype &#x3D; mime.lookup(pUrl.pathname);
 
         if (!mimetype &amp;amp;&amp;amp; !options.unsafeMime)
             throw new Error(&#x27;Unable to determine MIME type using URL. Set unsafeMime to true to download it anyway.&#x27;);

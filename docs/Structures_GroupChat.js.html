@@ -109,40 +109,29 @@ class GroupChat extends Chat {
     async addParticipants(participantIds, options &#x3D; {}) {
         return await this.client.playPage.evaluate(async ({ groupId, participantIds, options }) &#x3D;&gt; {
             const { autoSendInviteV4 &#x3D; true, comment &#x3D; &#x27;&#x27; } &#x3D; options;
-            const groupWid &#x3D; window.WPP.whatsapp.WidFactory.createWid(groupId);
-            const group &#x3D; await window.WPP.whatsapp.ChatStore.find(groupWid);
+
+            const group &#x3D; await window.WPP.chat.get(groupId);
+            const results &#x3D; await window.WPP.group.addParticipants(groupId, participantIds);
 
             for (let participant of participantIds) {
-                const pWid &#x3D; window.WPP.whatsapp.WidFactory.createWid(participant);
-                const result &#x3D; await window.WPP.group.addParticipants(groupId, [participant]);
-                const rpcResult &#x3D; result[participant];
+                const result &#x3D; results[participant];
+                const userChat &#x3D; window.WPP.chat.get(participant);
 
-                if (autoSendInviteV4 &amp;amp;&amp;amp; rpcResult.code &#x3D;&#x3D;&#x3D; 403) {
-                    let userChat, isInviteV4Sent &#x3D; false;
-                    window.WPP.whatsapp.ContactStore.gadd(pWid, { silent: true });
-
-                    if (rpcResult.message.includes(&#x27;ParticipantRequestCodeCanBeSent&#x27;) &amp;amp;&amp;amp;
-                        (userChat &#x3D; await window.WPP.whatsapp.ChatStore.find(pWid))) {
-                        const groupName &#x3D; group.formattedTitle || group.name;
-                        const res &#x3D; await window.WPP.whatsapp.ChatModel.sendGroupInviteMessage(
-                            userChat,
-                            group.id._serialized,
-                            groupName,
-                            rpcResult.invite_code,
-                            rpcResult.invite_code_exp,
-                            comment,
-                            await window.WAJS.getProfilePicThumbToBase64(groupWid)
-                        );
-                        isInviteV4Sent &#x3D; window.WAJS.compareWwebVersions(window.Debug.VERSION, &#x27;&amp;lt;&#x27;, &#x27;2.2335.6&#x27;)
-                            ? res &#x3D;&#x3D;&#x3D; &#x27;OK&#x27;
-                            : res.messageSendResult &#x3D;&#x3D;&#x3D; &#x27;OK&#x27;;
-                    }
-
-                    result[participant].isInviteV4Sent &#x3D; isInviteV4Sent;
+                if (autoSendInviteV4 &amp;amp;&amp;amp; result.code &#x3D;&#x3D;&#x3D; 403) {
+                    const groupName &#x3D; group.formattedTitle || group.name || group.subject;
+                    await window.Store.GroupInviteV4.sendGroupInviteMessage(
+                        userChat,
+                        groupId,
+                        groupName,
+                        result.invite_code,
+                        result.invite_code_exp,
+                        comment,
+                        await window.WAJS.getProfilePicThumbToBase64(groupId)
+                    );
                 }
-
-                return rpcResult;
             }
+
+            return results;
         }, { groupId: this.id._serialized, participantIds, options });
     }
 

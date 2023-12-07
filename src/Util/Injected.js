@@ -9,7 +9,7 @@ exports.StoreObject = () => {
         },
         {
             id: 'Validators',
-            conditions: (module) => (module.findLinks ? module : null),
+            conditions: (module) => module.findLinks && module
         },
         {
             id: 'StickerTools',
@@ -29,7 +29,7 @@ exports.StoreObject = () => {
         },
         {
             id: 'getMsgInfo',
-            conditions: (module) => (module.sendQueryMsgInfo || module.queryMsgInfo)
+            conditions: (module) => module.queryMsgInfo && module
         },
         {
             id: 'QueryOrder',
@@ -42,6 +42,10 @@ exports.StoreObject = () => {
         {
             id: 'ContactMethods',
             conditions: (module) => module.getIsMe && module
+        },
+        {
+            id: 'GroupInviteV4',
+            conditions: (module) => module.sendGroupInviteMessage && module
         }
     ];
 
@@ -654,8 +658,8 @@ exports.LoadUtils = () => {
         });
     };
 
-    window.WAJS.getProfilePicThumbToBase64 = async (chatWid) => {
-        const profilePicCollection = await window.WPP.contact.getProfilePictureUrl(chatWid);
+    window.WAJS.getProfilePicThumbToBase64 = async (chatId) => {
+        const profilePicCollection = await window.WPP.contact.getProfilePictureUrl(chatId);
 
         const _readImageAsBase64 = (imageBlob) => {
             return new Promise((resolve) => {

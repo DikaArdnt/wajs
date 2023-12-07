@@ -40,7 +40,7 @@
         },
         {
             id: &#x27;Validators&#x27;,
-            conditions: (module) &#x3D;&gt; (module.findLinks ? module : null),
+            conditions: (module) &#x3D;&gt; module.findLinks &amp;amp;&amp;amp; module
         },
         {
             id: &#x27;StickerTools&#x27;,
@@ -60,7 +60,7 @@
         },
         {
             id: &#x27;getMsgInfo&#x27;,
-            conditions: (module) &#x3D;&gt; (module.sendQueryMsgInfo || module.queryMsgInfo)
+            conditions: (module) &#x3D;&gt; module.queryMsgInfo &amp;amp;&amp;amp; module
         },
         {
             id: &#x27;QueryOrder&#x27;,
@@ -73,6 +73,10 @@
         {
             id: &#x27;ContactMethods&#x27;,
             conditions: (module) &#x3D;&gt; module.getIsMe &amp;amp;&amp;amp; module
+        },
+        {
+            id: &#x27;GroupInviteV4&#x27;,
+            conditions: (module) &#x3D;&gt; module.sendGroupInviteMessage &amp;amp;&amp;amp; module
         }
     ];
 
@@ -685,8 +689,8 @@ exports.LoadUtils &#x3D; () &#x3D;&gt; {
         });
     };
 
-    window.WAJS.getProfilePicThumbToBase64 &#x3D; async (chatWid) &#x3D;&gt; {
-        const profilePicCollection &#x3D; await window.WPP.contact.getProfilePictureUrl(chatWid);
+    window.WAJS.getProfilePicThumbToBase64 &#x3D; async (chatId) &#x3D;&gt; {
+        const profilePicCollection &#x3D; await window.WPP.contact.getProfilePictureUrl(chatId);
 
         const _readImageAsBase64 &#x3D; (imageBlob) &#x3D;&gt; {
             return new Promise((resolve) &#x3D;&gt; {

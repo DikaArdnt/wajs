@@ -447,7 +447,7 @@ class Client extends EventEmitter {
                     const streamStatus &#x3D; window.WPP?.whatsapp?.Stream?.displayInfo;
                     window.EmitEvent(Events.AUTHENTICATED, streamStatus);
                 });
-
+                window.WPP.whatsapp.Socket.on(&#x27;change:state&#x27;, (_AppState, state) &#x3D;&gt; { window.onAppStateChangedEvent(state); });
                 window.WPP.on(&#x27;conn.main_loaded&#x27;, () &#x3D;&gt; {
                     const info &#x3D; window.WPP.conn.getHistorySyncProgress();
                     if (info.inProgress) {
@@ -466,7 +466,6 @@ class Client extends EventEmitter {
                     window.WPP.whatsapp.MsgStore.on(&#x27;change:isUnsentMedia&#x27;, (msg, unsent) &#x3D;&gt; { if (msg.id.fromMe &amp;amp;&amp;amp; !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
                     window.WPP.whatsapp.MsgStore.on(&#x27;remove&#x27;, (msg) &#x3D;&gt; { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
                     window.WPP.whatsapp.MsgStore.on(&#x27;change:caption&#x27;, (msg, newBody, prevBody) &#x3D;&gt; { window.onEditMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
-                    window.WPP.whatsapp.Socket.on(&#x27;change:state&#x27;, (_AppState, state) &#x3D;&gt; { window.onAppStateChangedEvent(state); });
                     window.WPP.whatsapp.CallStore.on(&#x27;add&#x27;, (call) &#x3D;&gt; { window.onIncomingCall(call); });
                     window.WPP.whatsapp.ChatStore.on(&#x27;remove&#x27;, async (chat) &#x3D;&gt; { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
                     window.WPP.whatsapp.ChatStore.on(&#x27;change:archive&#x27;, async (chat, currState, prevState) &#x3D;&gt; { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
@@ -602,12 +601,12 @@ class Client extends EventEmitter {
         if (content instanceof MessageMedia) {
             internalOptions.attachment &#x3D; content;
             internalOptions.isViewOnce &#x3D; options.isViewOnce,
-                content &#x3D; &#x27;&#x27;;
+            content &#x3D; &#x27;&#x27;;
         } else if (options.media instanceof MessageMedia) {
             internalOptions.attachment &#x3D; options.media;
             internalOptions.caption &#x3D; content;
             internalOptions.isViewOnce &#x3D; options.isViewOnce,
-                content &#x3D; &#x27;&#x27;;
+            content &#x3D; &#x27;&#x27;;
         } else if (content instanceof Location) {
             internalOptions.location &#x3D; content;
             content &#x3D; &#x27;&#x27;;
@@ -625,11 +624,11 @@ class Client extends EventEmitter {
         if (internalOptions.sendMediaAsSticker &amp;amp;&amp;amp; internalOptions.attachment) {
             internalOptions.attachment &#x3D; await Util.formatToWebpSticker(
                 internalOptions.attachment, {
-                name: options.stickerName,
-                author: options.stickerAuthor,
-                categories: options.stickerCategories,
-                isAvatarSticker: options.stickerIsAvatar,
-            }, this.playPage
+                    name: options.stickerName,
+                    author: options.stickerAuthor,
+                    categories: options.stickerCategories,
+                    isAvatarSticker: options.stickerIsAvatar,
+                }, this.playPage
             );
         }
 
@@ -1053,7 +1052,7 @@ class Client extends EventEmitter {
                 else failedParticipants.push(participant);
             }
 
-            parentGroupId &amp;amp;&amp;amp; (parentGroupWid &#x3D; window.Store.WidFactory.createWid(parentGroupId));
+            parentGroupId &amp;amp;&amp;amp; (parentGroupWid &#x3D; window.WPP.whatsapp.WidFactory.createWid(parentGroupId));
 
             try {
                 createGroupResult &#x3D; await window.WPP.whatsapp.functions.sendCreateGroup(
@@ -1073,14 +1072,14 @@ class Client extends EventEmitter {
 
                 if (autoSendInviteV4 &amp;amp;&amp;amp; statusCode &#x3D;&#x3D;&#x3D; 403) {
                     window.WPP.whatsapp.ContactStore.gadd(participant.wid, { silent: true });
-                    const addParticipantResult &#x3D; await window.WPP.whatsapp.ChatModel.sendGroupInviteMessage(
+                    const addParticipantResult &#x3D; await window.Store.GroupInviteV4.sendGroupInviteMessage(
                         await window.WPP.whatsapp.ChatStore.find(participant.wid),
                         createGroupResult.wid._serialized,
                         createGroupResult.subject,
                         participant.invite_code,
                         participant.invite_code_exp,
                         comment,
-                        await window.WAJS.getProfilePicThumbToBase64(createGroupResult.wid)
+                        await window.WAJS.getProfilePicThumbToBase64(createGroupResult.wid._serialized)
                     );
                     isInviteV4Sent &#x3D; window.WAJS.compareWwebVersions(window.Debug.VERSION, &#x27;&amp;lt;&#x27;, &#x27;2.2335.6&#x27;)
                         ? addParticipantResult &#x3D;&#x3D;&#x3D; &#x27;OK&#x27;
