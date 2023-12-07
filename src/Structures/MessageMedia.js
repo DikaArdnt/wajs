@@ -66,7 +66,7 @@ class MessageMedia {
      */
     static async fromUrl(url, options = {}) {
         const pUrl = new URL(url);
-        let mimetype = mime.getType(pUrl.pathname);
+        let mimetype = mime.lookup(pUrl.pathname);
 
         if (!mimetype && !options.unsafeMime)
             throw new Error('Unable to determine MIME type using URL. Set unsafeMime to true to download it anyway.');
