@@ -10,7 +10,6 @@ const ChatFactory = require('./Factories/ChatFactory');
 const ContactFactory = require('./Factories/ContactFactory');
 const { getPage } = require('./Util/Browser');
 const { DefaultOptions, Events, WAState } = require('./Util/Constant');
-const { LoadUtils, StoreObject } = require('./Util/Injected');
 const { GroupNotification, Message, ClientInfo, Call, MessageMedia, Location, Poll, Contact, Label, Reaction } = require('./Structures/index');
 
 /**
@@ -151,7 +150,6 @@ class Client extends EventEmitter {
         });
 
         let last_message;
-
         await page.exposeFunction('onChangeMessageTypeEvent', (msg) => {
 
             if (msg.type === 'revoked') {
@@ -250,21 +248,6 @@ class Client extends EventEmitter {
              * @param {Message} message The message with media that was uploaded
              */
             this.emit(Events.MEDIA_UPLOADED, message);
-        });
-
-        await page.exposeFunction('onEditMessageEvent', (msg, newBody, prevBody) => {
-
-            if (msg.type === 'revoked') {
-                return;
-            }
-            /**
-             * Emitted when messages are edited
-             * @event Client#message_edit
-             * @param {Message} message
-             * @param {string} newBody
-             * @param {string} prevBody
-             */
-            this.emit(Events.MESSAGE_EDIT, new Message(this, msg), newBody, prevBody);
         });
 
         await page.exposeFunction('onAppStateChangedEvent', async (state) => {
@@ -372,110 +355,86 @@ class Client extends EventEmitter {
 
         await page.exposeFunction('log', (data) => console.log(data));
 
-        page.on('load', async () => {
-            await page.waitForFunction(() => window.WPP?.isReady);
+        const isRegistered = await this.playPage.evaluate(() => window.WPP.conn.isRegistered());
 
-            // setup options WPP
-            await page.evaluate((options) => {
-                window.WPPConfig = options;
-            }, this.options);
-
-            // Load Store
-            await page.evaluate(StoreObject);
-
-            // Check window.Store Injection
-            await page.waitForFunction('window.Store != undefined');
-
-            //Load util functions (serializers, helper functions)
-            await page.evaluate(LoadUtils);
-
-            const isAuthenticated = await this.playPage.evaluate(() => window.WPP.conn.isRegistered());
-
-            if (isAuthenticated === false) {
-                await this.playPage.evaluate(({ CODE_RECEIVED, pairingNumber }) => {
-                    window.WPP.on('conn.auth_code_change', async (auth) => {
-                        if (pairingNumber) {
-                            const code = await window.WPP.conn.genLinkDeviceCodeForPhoneNumber(pairingNumber, true);
-                            window.EmitEvent(CODE_RECEIVED, code);
-                        } else {
-                            window.qrChanged(auth.fullCode + ',1');
-                        }
-                    });
-                }, { CODE_RECEIVED: Events.CODE_RECEIVED, pairingNumber: this.options.pairingNumber });
-            }
-
-            if (isAuthenticated === null) {
-                await this.playPage.evaluate((Events) => {
-                    const streamStatus = window.WPP?.whatsapp?.Stream?.displayInfo;
-                    window.EmitEvent(Events.AUTHENTICATION_FAILURE, streamStatus);
-                }, Events);
-            }
-
-            await this.playPage.evaluate((Events) => {
-                window.WPP.on('conn.authenticated', () => {
-                    const streamStatus = window.WPP?.whatsapp?.Stream?.displayInfo;
-                    window.EmitEvent(Events.AUTHENTICATED, streamStatus);
-                });
-                window.WPP.whatsapp.Socket.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
-                window.WPP.on('conn.main_loaded', () => {
-                    const info = window.WPP.conn.getHistorySyncProgress();
-                    if (info.inProgress) {
-                        window.EmitEvent(Events.LOADING_SCREEN, info.progress, info.progress + '% Organizing your messages');
+        if (isRegistered === false) {
+            await this.playPage.evaluate(({ CODE_RECEIVED, pairingNumber }) => {
+                window.WPP.on('conn.auth_code_change', async (auth) => {
+                    if (pairingNumber) {
+                        const code = await window.WPP.conn.genLinkDeviceCodeForPhoneNumber(pairingNumber, true);
+                        window.EmitEvent(CODE_RECEIVED, code);
                     } else {
-                        window.EmitEvent(Events.LOADING_SCREEN, '', 'Loading Your Chats');
+                        window.qrChanged(auth.fullCode + ',1');
                     }
                 });
-            }, Events);
+            }, { CODE_RECEIVED: Events.CODE_RECEIVED, pairingNumber: this.options.pairingNumber });
+        }
 
+        if (isRegistered === null) {
             await this.playPage.evaluate((Events) => {
-                window.WPP.on('conn.main_ready', async () => {
-                    window.WPP.whatsapp.MsgStore.on('change', (msg) => { window.onChangeMessageEvent(window.WAJS.getMessageModel(msg)); });
-                    window.WPP.whatsapp.MsgStore.on('change:type', (msg) => { window.onChangeMessageTypeEvent(window.WAJS.getMessageModel(msg)); });
-                    window.WPP.whatsapp.MsgStore.on('change:ack', (msg, ack) => { window.onMessageAckEvent(window.WAJS.getMessageModel(msg), ack); });
-                    window.WPP.whatsapp.MsgStore.on('change:isUnsentMedia', (msg, unsent) => { if (msg.id.fromMe && !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
-                    window.WPP.whatsapp.MsgStore.on('remove', (msg) => { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
-                    window.WPP.whatsapp.MsgStore.on('change:caption', (msg, newBody, prevBody) => { window.onEditMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
-                    window.WPP.whatsapp.CallStore.on('add', (call) => { window.onIncomingCall(call); });
-                    window.WPP.whatsapp.ChatStore.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
-                    window.WPP.whatsapp.ChatStore.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
-                    window.WPP.on('chat.new_message', (msg) => {
-                        if (msg.isNewMsg) {
-                            if (msg.type === 'ciphertext') {
-                                // defer message event until ciphertext is resolved (type changed)
-                                msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
-                            } else {
-                                window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
-                            }
-                        }
-                    });
-                    window.WPP.whatsapp.ChatStore.on('change:unreadCount', async (chat) => { window.onChatUnreadCountEvent(await window.WAJS.getChatModel(chat)); });
-
-                    window.WPP.on('chat.new_reaction', (reaction) => {
-                        window.onReaction([reaction]);
-                    });
-
-                    window.EmitEvent(Events.READY);
-                });
+                const streamStatus = window.WPP?.whatsapp?.Stream?.displayInfo;
+                window.EmitEvent(Events.AUTHENTICATION_FAILURE, streamStatus);
             }, Events);
+        }
 
-            await this.playPage.evaluate((Events) => {
-                window.WPP.whatsapp.Cmd.on('logout', () => window.EmitEvent(Events.DISCONNECTED, 'NAVIGATION'));
-            }, Events);
+        await this.playPage.waitForFunction(() => window.WPP.conn.isRegistered());
 
-            if (isAuthenticated) {
-                // Expose client info
-                /**
-                 * Current connection information
-                 * @type {ClientInfo}
-                 */
-                this.info = new ClientInfo(this, await page.evaluate(() => {
-                    return { ...window.WPP.whatsapp.Conn.serialize(), wid: window.WPP.whatsapp.UserPrefs.getMeUser() };
-                }));
+        await this.playPage.evaluate((Events) => {
+            const streamStatus = window.WPP?.whatsapp?.Stream?.displayInfo;
+            window.EmitEvent(Events.AUTHENTICATED, streamStatus);
 
-                // Add InterfaceController
-                this.interface = new InterfaceController(this);
-            }
-        });
+            window.WPP.on('conn.main_loaded', () => {
+                const info = window.WPP.conn.getHistorySyncProgress();
+                if (info.inProgress) {
+                    window.EmitEvent(Events.LOADING_SCREEN, info.progress, info.progress + '% Organizing your messages');
+                } else {
+                    window.EmitEvent(Events.LOADING_SCREEN, '', 'Loading Your Chats');
+                }
+            });
+            window.WPP.on('conn.main_ready', () => window.EmitEvent(Events.READY));
+
+            window.WPP.whatsapp.MsgStore.on('change', (msg) => { window.onChangeMessageEvent(window.WAJS.getMessageModel(msg)); });
+            window.WPP.whatsapp.MsgStore.on('change:type', (msg) => { window.onChangeMessageTypeEvent(window.WAJS.getMessageModel(msg)); });
+            window.WPP.whatsapp.MsgStore.on('change:ack', (msg, ack) => { window.onMessageAckEvent(window.WAJS.getMessageModel(msg), ack); });
+            window.WPP.whatsapp.MsgStore.on('change:isUnsentMedia', (msg, unsent) => { if (msg.id.fromMe && !unsent) window.onMessageMediaUploadedEvent(window.WAJS.getMessageModel(msg)); });
+            window.WPP.whatsapp.MsgStore.on('remove', (msg) => { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WAJS.getMessageModel(msg)); });
+            window.WPP.whatsapp.MsgStore.on('change:body change:caption', (msg, newBody, prevBody) => { window.onAddMessageEvent(window.WAJS.getMessageModel(msg), newBody, prevBody); });
+            window.WPP.whatsapp.Socket.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
+            window.WPP.whatsapp.CallStore.on('add', (call) => { window.onIncomingCall(call); });
+            window.WPP.whatsapp.ChatStore.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WAJS.getChatModel(chat)); });
+            window.WPP.whatsapp.ChatStore.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WAJS.getChatModel(chat), currState, prevState); });
+            window.WPP.on('chat.new_message', (msg) => {
+                if (msg.isNewMsg) {
+                    if (msg.type === 'ciphertext') {
+                        // defer message event until ciphertext is resolved (type changed)
+                        msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
+                    } else {
+                        window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
+                    }
+                }
+            });
+            window.WPP.whatsapp.ChatStore.on('change:unreadCount', async (chat) => { window.onChatUnreadCountEvent(await window.WAJS.getChatModel(chat)); });
+
+            window.WPP.on('chat.new_reaction', (reaction) => {
+                window.onReaction([reaction]);
+            });
+        }, Events);
+
+        await this.playPage.evaluate((Events) => {
+            window.WPP.whatsapp.Cmd.on('logout', () => window.EmitEvent(Events.DISCONNECTED, 'NAVIGATION'));
+        }, Events);
+
+        // Expose client info
+        /**
+         * Current connection information
+         * @type {ClientInfo}
+         */
+        this.info = new ClientInfo(this, await page.evaluate(() => {
+            return { ...window.WPP.whatsapp.Conn.serialize(), wid: window.WPP.whatsapp.UserPrefs.getMeUser() };
+        }));
+
+        // Add InterfaceController
+        this.interface = new InterfaceController(this);
     }
 
     async destroy() {

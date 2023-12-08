@@ -21,7 +21,7 @@ class Message extends Base {
     }
 
     _patch(data) {
-        this._data = data;
+        Object.defineProperty(this, '_data', { value: data });
 
         /**
          * MediaKey that represents the sticker 'ID'

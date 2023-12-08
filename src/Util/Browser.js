@@ -4,6 +4,7 @@ const path = require('path');
 const playwright = require('playwright');
 
 const { WhatsWebURL } = require('./Constant');
+const { LoadUtils, StoreObject } = require('./Injected');
 
 async function preparePage(page, version) {
     page.route('https://web.whatsapp.com/**', (route) => {
@@ -74,23 +75,37 @@ async function getPage(options = {}) {
 
     await preparePage(page, WWebVersion);
 
-    setTimeout(async () => {
-        await page.goto(WhatsWebURL, {
-            waitUntil: 'load',
-            timeout: 0,
-            referer: 'https://whatsapp.com/'
-        });
+    await page.goto(WhatsWebURL, {
+        waitUntil: 'load',
+        timeout: 0,
+        referer: 'https://whatsapp.com/'
+    });
 
-        page.setDefaultTimeout(0);
+    page.setDefaultTimeout(0);
 
-        await page.waitForFunction(() => (window).Debug?.VERSION, {}, { timeout: 0 }).catch(() => null);
+    await page.waitForFunction(() => (window).Debug?.VERSION, {}, { timeout: 0 }).catch(() => null);
 
-        const version = await page
-            .evaluate(() => (window).Debug.VERSION)
-            .catch(() => null);
+    const version = await page
+        .evaluate(() => (window).Debug.VERSION)
+        .catch(() => null);
 
-        console.log('WhatsApp Version: ', version);
-    }, 1000);
+    console.log('WhatsApp Version: ', version);
+
+    await page.waitForFunction(() => window.WPP?.isReady, {}, { timeout: 0 });
+
+    // setup options WPP
+    await page.evaluate((options) => {
+        window.WPPConfig = options;
+    }, options);
+
+    // Load Store
+    await page.evaluate(StoreObject);
+
+    // Check window.Store Injection
+    await page.waitForFunction('window.Store != undefined');
+
+    //Load util functions (serializers, helper functions)
+    await page.evaluate(LoadUtils);
 
     return { browser, page };
 }
