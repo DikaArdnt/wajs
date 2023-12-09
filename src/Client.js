@@ -430,7 +430,9 @@ class Client extends EventEmitter {
          * @type {ClientInfo}
          */
         this.info = new ClientInfo(this, await page.evaluate(() => {
-            return { ...window.WPP.whatsapp.Conn.serialize(), wid: window.WPP.whatsapp.UserPrefs.getMeUser() };
+            const pushname = window.WPP.whatsapp.Conn.pushname
+            const platform = window.WPP.whatsapp.Conn.platform
+            return { pushname, platform, wid: window.WPP.whatsapp.UserPrefs.getMeUser() };
         }));
 
         // Add InterfaceController

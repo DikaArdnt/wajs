@@ -357,11 +357,6 @@ declare namespace WAJS {
         me: ContactId
         /** Current user ID */
         wid: ContactId
-        /** 
-         * Information about the phone this client is connected to.  Not available in multi-device. 
-         * @deprecated 
-         */
-        phone: ClientInfoPhone
         /** Platform the phone is running on */
         platform: string
         /** Name configured to be shown in push notifications */
@@ -369,23 +364,6 @@ declare namespace WAJS {
 
         /** Get current battery percentage and charging status for the attached device */
         getBatteryStatus: () => Promise<BatteryInfo>
-    }
-
-    /** 
-     * Information about the phone this client is connected to 
-     * @deprecated
-     */
-    export interface ClientInfoPhone {
-        /** WhatsApp Version running on the phone */
-        wa_version: string
-        /** OS Version running on the phone (iOS or Android version) */
-        os_version: string
-        /** Device manufacturer */
-        device_manufacturer: string
-        /** Device model */
-        device_model: string
-        /** OS build number */
-        os_build_number: string
     }
 
     /** Options for initializing the whatsapp client */
