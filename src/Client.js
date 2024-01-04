@@ -34,6 +34,7 @@ const { GroupNotification, Message, ClientInfo, Call, MessageMedia, Location, Po
  * @fires Client#message_create
  * @fires Client#message_revoke_me
  * @fires Client#message_revoke_everyone
+ * @fires Client#message_ciphertext
  * @fires Client#media_uploaded
  * @fires Client#group_join
  * @fires Client#group_leave
@@ -408,6 +409,7 @@ class Client extends EventEmitter {
                     if (msg.type === 'ciphertext') {
                         // defer message event until ciphertext is resolved (type changed)
                         msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WAJS.getMessageModel(_msg)));
+                        window.EmitEvent(Events.MESSAGE_CIPHERTEXT, window.WWebJS.getMessageModel(msg));
                     } else {
                         window.onAddMessageEvent(window.WAJS.getMessageModel(msg));
                     }
@@ -430,8 +432,8 @@ class Client extends EventEmitter {
          * @type {ClientInfo}
          */
         this.info = new ClientInfo(this, await page.evaluate(() => {
-            const pushname = window.WPP.whatsapp.Conn.pushname
-            const platform = window.WPP.whatsapp.Conn.platform
+            const pushname = window.WPP.whatsapp.Conn.pushname;
+            const platform = window.WPP.whatsapp.Conn.platform;
             return { pushname, platform, wid: window.WPP.whatsapp.UserPrefs.getMeUser() };
         }));
 
@@ -1001,19 +1003,14 @@ class Client extends EventEmitter {
                 const statusCode = participant.error ?? 200;
 
                 if (autoSendInviteV4 && statusCode === 403) {
-                    window.WPP.whatsapp.ContactStore.gadd(participant.wid, { silent: true });
-                    const addParticipantResult = await window.Store.GroupInviteV4.sendGroupInviteMessage(
-                        await window.WPP.whatsapp.ChatStore.find(participant.wid),
-                        createGroupResult.wid._serialized,
-                        createGroupResult.subject,
-                        participant.invite_code,
-                        participant.invite_code_exp,
-                        comment,
-                        await window.WAJS.getProfilePicThumbToBase64(createGroupResult.wid._serialized)
-                    );
-                    isInviteV4Sent = window.WAJS.compareWwebVersions(window.Debug.VERSION, '<', '2.2335.6')
-                        ? addParticipantResult === 'OK'
-                        : addParticipantResult.messageSendResult === 'OK';
+                    await Util.sleep(2500);
+                    await window.WPP.chat.sendGroupInviteMessage(participantId, {
+                        inviteCode: participant.invite_code,
+                        inviteCodeExpiration: participant.invite_code_exp,
+                        groupId: createGroupResult.wid._serialized,
+                        caption: comment
+                    });
+                    isInviteV4Sent = true;
                 }
 
                 participantData[participantId] = {

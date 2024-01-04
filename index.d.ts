@@ -286,6 +286,12 @@ declare namespace WAJS {
             message: Message
         ) => void): this
 
+        /** Emitted when a new message ciphertext is received  */
+        on(event: 'message_ciphertext', listener: (
+            /** The message that was ciphertext */
+            message: Message
+        ) => void): this
+
         /** Emitted when a message is deleted for everyone in the chat */
         on(event: 'message_revoke_everyone', listener: (
             /** The message that was revoked, in its current state. It will not contain the original message's data */

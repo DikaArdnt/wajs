@@ -29,7 +29,7 @@ exports.StoreObject = () => {
         },
         {
             id: 'getMsgInfo',
-            conditions: (module) => module.queryMsgInfo && module
+            conditions: (module) => (module.sendQueryMsgInfo || module.queryMsgInfo) && module
         },
         {
             id: 'QueryOrder',
@@ -122,10 +122,7 @@ exports.LoadUtils = () => {
                     forceGif: options.sendVideoAsGif
                 });
 
-            if (options.caption) {
-                attOptions.caption = options.caption;
-                delete options.caption;
-            }
+            attOptions.caption = options.caption;
             content = options.sendMediaAsSticker ? undefined : attOptions.preview;
             attOptions.isViewOnce = options.isViewOnce;
 
@@ -146,7 +143,7 @@ exports.LoadUtils = () => {
         }
 
         if (options.mentionedJidList) {
-            options.mentionedJidList = options.mentionedJidList.map(cId => window.WPP.whatsapp.ContactStore.get(cId).id);
+            options.mentionedJidList = options.mentionedJidList.map(cId => window.WPP.whatsapp.WidFactory.createWid(cId));
         }
 
         let locationOptions = {};

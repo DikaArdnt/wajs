@@ -1,6 +1,7 @@
 'use strict';
 
 const Chat = require('./Chat');
+const Util = require('../Util/Util');
 
 /**
  * Group participant information
@@ -79,28 +80,19 @@ class GroupChat extends Chat {
         return await this.client.playPage.evaluate(async ({ groupId, participantIds, options }) => {
             const { autoSendInviteV4 = true, comment = '' } = options;
 
-            const group = await window.WPP.chat.get(groupId);
-            const results = await window.WPP.group.addParticipants(groupId, participantIds);
-
             for (let participant of participantIds) {
+                await Util.sleep(2500);
+                const results = await window.WPP.group.addParticipants(groupId, participant);
                 const result = results[participant];
-                const userChat = window.WPP.chat.get(participant);
-
-                if (autoSendInviteV4 && result.code === 403) {
-                    const groupName = group.formattedTitle || group.name || group.subject;
-                    await window.Store.GroupInviteV4.sendGroupInviteMessage(
-                        userChat,
-                        groupId,
-                        groupName,
-                        result.invite_code,
-                        result.invite_code_exp,
-                        comment,
-                        await window.WAJS.getProfilePicThumbToBase64(groupId)
-                    );
+                if (autoSendInviteV4 && result.invite_code) {
+                    await window.WPP.chat.sendGroupInviteMessage(participant, {
+                        inviteCode: result.invite_code,
+                        inviteCodeExpiration: result.invite_code_exp,
+                        groupId: groupId,
+                        caption: comment
+                    });
                 }
             }
-
-            return results;
         }, { groupId: this.id._serialized, participantIds, options });
     }
 
