@@ -46,6 +46,10 @@ exports.StoreObject = () => {
         {
             id: 'GroupInviteV4',
             conditions: (module) => module.sendGroupInviteMessage && module
+        },
+        {
+            id: 'PinUnpinMsg',
+            conditions: (module) => module.sendPinInChatMsg && module
         }
     ];
 

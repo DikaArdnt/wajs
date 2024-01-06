@@ -6,7 +6,6 @@ const MessageMedia = require('./MessageMedia');
 const Order = require('./Order');
 const Payment = require('./Payment');
 const Reaction = require('./Reaction');
-const Contact = require('./Contact');
 const { MessageTypes } = require('../Util/Constant');
 
 /**
@@ -430,26 +429,14 @@ class Message extends Base {
             if (!msg) {
                 return undefined;
             }
-            if (msg.mediaData.mediaStage != 'RESOLVED') {
-                // try to resolve media
-                await msg.downloadMedia({
-                    downloadEvenIfExpensive: true,
-                    rmrReason: 1
-                });
-            }
-
-            if (msg.mediaData.mediaStage.includes('ERROR') || msg.mediaData.mediaStage === 'FETCHING') {
-                // media could not be downloaded
-                return undefined;
-            }
 
             try {
-                const decryptedMedia = await window.WPP.whatsapp.MediaBlobCache.get(msg.filehash);
+                const decryptedMedia = await window.WPP.chat.downloadMedia(msgId);
 
-                const data = await window.WAJS.arrayBufferToBase64Async(decryptedMedia);
+                const data = window.WPP.util.blobToBase64(decryptedMedia);
 
                 return {
-                    data,
+                    data: data.split(',')[1],
                     mimetype: msg.mimetype,
                     filename: msg.filename,
                     filesize: msg.size
@@ -597,8 +584,8 @@ class Message extends Base {
      * @returns {Promise<?Message>}
      */
     async edit(content, options = {}) {
-        if (options.mentions && options.mentions.some(possiblyContact => possiblyContact instanceof Contact)) {
-            options.mentions = options.mentions.map(a => a.id._serialized);
+        if (Array.isArray(options.mentions) && options.mentions.length !== 0) {
+            options.mentions = options.mentions.map(v => typeof v === 'object' ? v.id._serialized : v);
         }
         let internalOptions = {
             linkPreview: options.linkPreview === false ? undefined : true,
@@ -616,6 +603,35 @@ class Message extends Base {
             return new Message(this.client, messageEdit);
         }
         return null;
+    }
+
+    /**
+     * It is used to pin a message
+     * @param {Number} duration duration as seconds
+     * @returns {Promise<Boolean>} returns a boolean result, true if successful and false if failed.
+     */
+    async pin(duration) {
+        return await this.client.playPage(async ({ msgId, duration }) => {
+            const message = window.WPP.whatsapp.MsgStore.get(msgId);
+            if (!message) return false;
+            const response = await window.Store.PinUnpinMsg.sendPinInChatMsg(message, 1, duration);
+            if (response.messageSendResult === 'OK') return true;
+            return false;
+        }, { msgId: this.id._serialized, duration });
+    }
+
+    /**
+     * It is used to unpin a message
+     * @returns {Promise<Boolean>} returns a boolean result, true if successful and false if failed.
+     */
+    async unpin() {
+        return await this.client.playPage(async (msgId) => {
+            const message = window.WPP.whatsapp.MsgStore.get(msgId);
+            if (!message) return false;
+            const response = await window.Store.PinUnpinMsg.sendPinInChatMsg(message, 2);
+            if (response.messageSendResult === 'OK') return true;
+            return false;
+        }, this.id._serialized);
     }
 }
 

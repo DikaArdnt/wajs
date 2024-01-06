@@ -836,6 +836,10 @@ declare namespace WAJS {
         getReactions: () => Promise<ReactionList[]>,
         /** Edits the current message */
         edit: (content: MessageContent, options?: MessageEditOptions) => Promise<Message | null>,
+        /** Pins the message (group admins can pin messages of all group members) */
+        pin: (duration: number) => Promise<boolean>,
+        /** Unpins the message (group admins can unpin messages of all group members) */
+        unpin: () => Promise<boolean>,
     }
 
     /** ID that represents a message */
