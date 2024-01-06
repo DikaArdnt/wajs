@@ -433,7 +433,7 @@ class Message extends Base {
             try {
                 const decryptedMedia = await window.WPP.chat.downloadMedia(msgId);
 
-                const data = window.WPP.util.blobToBase64(decryptedMedia);
+                const data = await window.WPP.util.blobToBase64(decryptedMedia);
 
                 return {
                     data: data.split(',')[1],
