@@ -51,7 +51,13 @@ class Client extends EventEmitter {
 
         this.options = Util.mergeDefault(DefaultOptions, options);
 
+        /**
+         * @type {import('playwright').Browser}
+         */
         this.playBrowser = null;
+        /**
+         * @type {import('playwright').Page}
+         */
         this.playPage = null;
     }
 
@@ -362,7 +368,7 @@ class Client extends EventEmitter {
             await this.playPage.evaluate(({ CODE_RECEIVED, pairingNumber }) => {
                 window.WPP.on('conn.auth_code_change', async (auth) => {
                     if (pairingNumber) {
-                        const code = await window.WPP.conn.genLinkDeviceCodeForPhoneNumber(pairingNumber, true);
+                        const code = await window.WPP.conn.genLinkDeviceCodeForPhoneNumber(pairingNumber);
                         window.EmitEvent(CODE_RECEIVED, code);
                     } else {
                         window.qrChanged(auth.fullCode + ',1');
@@ -475,13 +481,18 @@ class Client extends EventEmitter {
     /**
      * Mark as seen for the Chat
      *  @param {string} chatId
+     *  @param {string} msgId 
      *  @returns {Promise<boolean>} result
      * 
      */
-    async sendSeen(chatId) {
-        const result = await this.playPage.evaluate(async (chatId) => {
+    async sendSeen(chatId, msgId) {
+        if (msgId && !msgId.includes('status@broadcast')) throw 'use the message id from status';
+        if (msgId && !msgId.includes(chatId)) throw 'chatId has no match in msgId';
+
+        const result = await this.playPage.evaluate(async ({ chatId, msgId }) => {
+            if (msgId) return window.WPP.status.sendReadStatus(chatId, msgId);
             return await window.WPP.chat.markIsRead(chatId);
-        }, chatId);
+        }, { chatId, msgId });
         return result;
     }
 
@@ -525,7 +536,8 @@ class Client extends EventEmitter {
             quotedMessageId: options.quotedMessageId,
             parseVCards: options.parseVCards === false ? false : true,
             mentionedJidList: Array.isArray(options.mentions) ? options.mentions.map(v => typeof v === 'object' ? v.id._serialized : v) : [],
-            extraOptions: options.extra
+            extraOptions: options.extra,
+            messageId: options.messageId
         };
 
         const sendSeen = typeof options.sendSeen === 'undefined' ? true : options.sendSeen;
@@ -565,16 +577,31 @@ class Client extends EventEmitter {
         }
 
         const newMessage = await this.playPage.evaluate(async ({ chatId, message, options, sendSeen }) => {
-            const chatWid = window.WPP.whatsapp.WidFactory.createWid(chatId);
-            const chat = await window.WPP.whatsapp.ChatStore.find(chatWid);
+            if (chatId === 'status@broadcast') {
+                if (typeof message === 'string') {
+                    const result = await window.WPP.status.sendTextStatus(message, options);
+                    return await (await window.WPP.whatsapp.MsgStore.get(result.id)).serialize();
+                } else if (/image/.test(message.mimetype)) {
+                    const result = await window.WPP.status.sendImageStatus(`data:${message.mimetype};base64,${message.data}`, options);
+                    return await (await window.WPP.whatsapp.MsgStore.get(result.id)).serialize();
+                } else if (/video/.test(message.mimetype)) {
+                    const result = await window.WPP.status.sendVideoStatus(`data:${message.mimetype};base64,${message.data}`, options);
+                    return await (await window.WPP.whatsapp.MsgStore.get(result.id)).serialize();
+                } else {
+                    throw new Error('Invalid type for status broadcast');
+                }
+            } else {
+                const chatWid = window.WPP.whatsapp.WidFactory.createWid(chatId);
+                const chat = await window.WPP.whatsapp.ChatStore.find(chatWid);
 
 
-            if (sendSeen) {
-                await window.WPP.whatsapp.functions.sendSeen(chat, false);
+                if (sendSeen) {
+                    await window.WPP.whatsapp.functions.sendSeen(chat, false);
+                }
+
+                const msg = await window.WAJS.sendMessage(chat, message, options, sendSeen);
+                return msg.serialize();
             }
-
-            const msg = await window.WAJS.sendMessage(chat, message, options, sendSeen);
-            return msg.serialize();
         }, { chatId, message: content, options: internalOptions, sendSeen });
 
         return new Message(this, newMessage);
@@ -1264,6 +1291,17 @@ class Client extends EventEmitter {
             await window.Store.Settings.setAutoDownloadVideos(flag);
             return flag;
         }, flag);
+    }
+
+    /**
+     * join as beta on WhatsApp Web
+     * @param {boolean} action true/false
+     * @returns 
+     */
+    async joinWebBeta(action = true) {
+        return await this.playPage.evaluate(async (action) => {
+            return await window.WPP.conn.joinWebBeta(action);
+        }, action);
     }
 }
 

@@ -228,7 +228,7 @@ exports.LoadUtils = () => {
 
         const fromwWid = window.WPP.whatsapp.UserPrefs.getMaybeMeUser();
         const isMD = window.WPP.conn.isMultiDevice();
-        const newId = await window.WPP.whatsapp.MsgKey.newId();
+        const newId = options?.messageId || await window.WPP.whatsapp.MsgKey.newId();
 
         const newMsgId = new window.WPP.whatsapp.MsgKey({
             from: fromwWid,

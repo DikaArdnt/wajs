@@ -20,7 +20,7 @@ class Message extends Base {
     }
 
     _patch(data) {
-        Object.defineProperty(this, '_data', { value: data });
+        Object.defineProperty(this, '_data', { value: data, writable: true });
 
         /**
          * MediaKey that represents the sticker 'ID'
@@ -425,7 +425,7 @@ class Message extends Base {
         }
 
         const result = await this.client.playPage.evaluate(async (msgId) => {
-            const msg = window.WPP.whatsapp.MsgStore.get(msgId);
+            const msg = await window.WPP.whatsapp.MsgStore.get(msgId);
             if (!msg) {
                 return undefined;
             }
@@ -433,7 +433,7 @@ class Message extends Base {
             try {
                 const decryptedMedia = await window.WPP.chat.downloadMedia(msgId);
 
-                const data = window.WPP.util.blobToBase64(decryptedMedia);
+                const data = await window.WPP.util.blobToBase64(decryptedMedia);
 
                 return {
                     data: data.split(',')[1],
@@ -458,7 +458,7 @@ class Message extends Base {
     async delete(everyone) {
         await this.client.playPage.evaluate(async ({ chatId, msgId, everyone }) => {
             return await window.WPP.chat.deleteMessage(chatId, msgId, true, everyone);
-        }, { chatId: this.from, msgId: this.id._serialized, everyone });
+        }, { chatId: this._getChatId(), msgId: this.id._serialized, everyone });
     }
 
     /**

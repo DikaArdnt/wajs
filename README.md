@@ -71,6 +71,7 @@ Take a look at [example.js](https://github.com/DikaArdnt/wajs/blob/master/exampl
 | Receive media (images/audio/video/documents)  | ✅  |
 | Send contact cards | ✅ |
 | Send location | ✅ |
+| Send status | ✅ |
 | Receive location | ✅ | 
 | Message replies | ✅ |
 | Join groups by invite  | ✅ |

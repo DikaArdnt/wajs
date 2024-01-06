@@ -164,6 +164,11 @@ declare namespace WAJS {
          * @param flag true/false on or off
          */
         setAutoDownloadVideos(flag: boolean): Promise<void>
+        /**
+         * join as beta on WHatsApp Web
+         * @param action true/false
+         */
+        joinWebBeta(action: boolean): Promise<void>
 
         /** Changes and returns the archive state of the Chat */
         unarchiveChat(chatId: string): Promise<boolean>
@@ -630,6 +635,16 @@ declare namespace WAJS {
         READY = 3,
     }
 
+    /** Font style for status */
+    export enum TextFontStyle {
+        SANS_SERIF = 0,
+        SERIF = 1,
+        NORICAN_REGULAR = 2,
+        BRYNDAN_WRITE = 3,
+        BEBASNEUE_REGULAR = 4,
+        OSWALD_HEAVY = 5,
+      }
+
     /** WhatsApp state */
     export enum WAState {
         CONFLICT = 'CONFLICT',
@@ -940,6 +955,14 @@ declare namespace WAJS {
         stickerCategories?: string[]
         /** Sticker as avatar, if sendMediaAsSticker is true */
         stickerIsAvatar?: boolean
+        /** style font status */
+        font?: TextFontStyle
+        /** background color for status */
+        backgroundColor?: string | number
+        /** text color for status, work only in APP */
+        textColor?: string | number
+        /** custom messageId */
+        messageId?: string
     }
 
     /** Options for editing a message */
