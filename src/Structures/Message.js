@@ -611,7 +611,7 @@ class Message extends Base {
      * @returns {Promise<Boolean>} returns a boolean result, true if successful and false if failed.
      */
     async pin(duration) {
-        return await this.client.playPage(async ({ msgId, duration }) => {
+        return await this.client.playPage.evaluate(async ({ msgId, duration }) => {
             const message = window.WPP.whatsapp.MsgStore.get(msgId);
             if (!message) return false;
             const response = await window.Store.PinUnpinMsg.sendPinInChatMsg(message, 1, duration);
@@ -625,7 +625,7 @@ class Message extends Base {
      * @returns {Promise<Boolean>} returns a boolean result, true if successful and false if failed.
      */
     async unpin() {
-        return await this.client.playPage(async (msgId) => {
+        return await this.client.playPage.evaluate(async (msgId) => {
             const message = window.WPP.whatsapp.MsgStore.get(msgId);
             if (!message) return false;
             const response = await window.Store.PinUnpinMsg.sendPinInChatMsg(message, 2);
